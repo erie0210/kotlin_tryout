@@ -1,4 +1,4 @@
-package com.example.blog
+package com.example.blog.service
 
 import org.redisson.api.RLock
 import org.redisson.api.RedissonClient
@@ -6,7 +6,9 @@ import org.springframework.stereotype.Service
 import java.util.concurrent.TimeUnit
 
 @Service
-class RedisService(val redisson: RedissonClient) {
+class RedisService(
+    private val redisson: RedissonClient
+) {
 
     private val DEFAULT_WAIT_TIME: Long = 15_000
     private val DEFAULT_LEASE_TIME: Long = 5_000
