@@ -6,6 +6,7 @@ import org.redisson.Redisson
 import org.redisson.client.RedisClient
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import redis.embedded.RedisServer
 import java.util.concurrent.Semaphore
@@ -23,6 +24,9 @@ class BlogInKotlinApplicationTests {
     val logger: Logger = LoggerFactory.getLogger(BlogInKotlinApplicationTests::class.java.name)
 
     private val testSample: Sample = Sample()
+
+    @Autowired
+    lateinit var redisson: Redisson
 
     @BeforeEach
     fun setup() {
@@ -102,28 +106,23 @@ class BlogInKotlinApplicationTests {
 
     @Test
     fun redisTest() {
-        var threads = ArrayList<Thread>(5000)
-        var redis = RedisServer()
-        redis.start()
-        Thread.sleep(5000)
-        var redisson = Redisson.create()
-        var lock = redisson.getLock("myLock")
-
+        val threads = ArrayList<Thread>(5000)
+        val lock = redisson.getLock("myLock")
 
         for (place: Int in 0 until 100) {
             threads.add(thread(start = false) {
                 try {
-                    var isLocked = lock.tryLock(30000, 2000, TimeUnit.MILLISECONDS)
-                    if (!isLocked) {
+                    if (lock.tryLock(30000, 2000, TimeUnit.MILLISECONDS)) {
+                        logger.info("${Thread.currentThread().name}/ place:$place was permitted.")
+                        if (count_limit > 0) {
+                            // api 통신에 50ms
+                            Thread.sleep(50)
+                            count_limit--
+                            total_prize_price += PRIZE_PRICE
+                            logger.info("place: $place // total prize price: $total_prize_price")
+                        }
+                    } else {
                         logger.warn("Redis Lock fail");
-                    }
-                     logger.info("${Thread.currentThread().name}/ place:$place was permitted.")
-                    if (count_limit > 0) {
-                        // api 통신에 50ms
-                        Thread.sleep(50)
-                        count_limit--
-                        total_prize_price += PRIZE_PRICE
-                         logger.info("place: $place // total prize price: $total_prize_price")
                     }
                 } catch (e: Exception) {
                     throw java.lang.RuntimeException(e)
@@ -139,7 +138,9 @@ class BlogInKotlinApplicationTests {
         for (t in threads) {
             t.join()
         }
-         logger.info("total_prize_price: $total_prize_price")
-        redis.stop()
+        logger.info("total_prize_price: $total_prize_price")
+
+        // Redis Config의 @PreDestory에서 서버를 종료시켜주므로 따로 종료를 하지 않아도 됨
+        // redisson.shutdown()
     }
 }
